@@ -3,6 +3,8 @@ package com.jas.sarees.saree;
 import java.io.IOException;
 import java.util.List;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -11,19 +13,23 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.multipart.MultipartFile;
 
 import jakarta.validation.Valid;
 
 @RestController
 @RequestMapping("/api/sarees")
 public class SareeController {
+    private static final Logger log = LoggerFactory.getLogger(SareeController.class);
 
     private final SareeRepository repository;
     private final ImageStorageService imageStorage;
+    private final DescriptionService descriptionService;
 
-    public SareeController(SareeRepository repository, ImageStorageService imageStorage) {
+    public SareeController(SareeRepository repository, ImageStorageService imageStorage,DescriptionService descriptionService) {
         this.repository = repository;
         this.imageStorage = imageStorage;
+        this.descriptionService = descriptionService;
     }
 
     @GetMapping
@@ -42,6 +48,25 @@ public class SareeController {
         saree.setPrice(request.price());
         saree.setSupplierWhatsapp(request.supplierWhatsapp());
         saree.setImageUrl(imageStorage.store(request.photo()));
+        applyDescription(saree, request.photo());
         return SareeResponse.from(repository.save(saree));
+    }
+        private void applyDescription(Saree saree, MultipartFile photo) {
+        String type = saree.getType();
+        saree.setTitle(type + " Saree");
+        saree.setDescription("A beautiful " + type.toLowerCase() + " saree from our latest collection.");
+
+        if (!descriptionService.isConfigured()) {
+            return;
+        }
+        try {
+            DescriptionService.Description d =
+                    descriptionService.describe(photo.getBytes(), photo.getContentType(), type);
+            String title = d.title();
+            saree.setTitle(title.length() > 200 ? title.substring(0, 200) : title);
+            saree.setDescription(d.text());
+        } catch (Exception e) {
+            log.warn("AI description failed, keeping the template: {}", e.getMessage());
+        }
     }
 }
