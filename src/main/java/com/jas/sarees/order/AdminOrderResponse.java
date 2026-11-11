@@ -16,13 +16,17 @@ public record AdminOrderResponse(
         String supplierWhatsapp,
         String whatsappLink,
         String status,
-        Instant createdAt
+        Instant createdAt,
+        String paymentMethod,
+        String transactionId,
+        boolean paymentVerified
 ) {
     public static AdminOrderResponse from(SareeOrder o, String whatsappLink) {
         return new AdminOrderResponse(o.getId(), o.getSaree().getId(), o.getSaree().getTitle(),
                 o.getSaree().getImageUrl(), o.getPriceAtOrder(), o.getCustomerName(),
                 o.getCustomerPhone(), o.getAddress(), o.getPincode(),
                 o.getSaree().getSupplierWhatsapp(), whatsappLink,
-                o.getStatus().name(), o.getCreatedAt());
+                o.getStatus().name(), o.getCreatedAt(),
+                o.getPaymentMethod().name(), o.getTransactionId(), o.isPaymentVerified());
     }
 }

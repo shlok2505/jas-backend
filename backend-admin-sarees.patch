@@ -1,0 +1,121 @@
+diff --git a/src/main/java/com/jas/sarees/saree/AdminSareeController.java b/src/main/java/com/jas/sarees/saree/AdminSareeController.java
+new file mode 100644
+index 0000000..44cdc09
+--- /dev/null
++++ b/src/main/java/com/jas/sarees/saree/AdminSareeController.java
+@@ -0,0 +1,73 @@
++package com.jas.sarees.saree;
++
++import java.math.BigDecimal;
++import java.util.List;
++
++import org.springframework.http.HttpStatus;
++import org.springframework.web.bind.annotation.GetMapping;
++import org.springframework.web.bind.annotation.PatchMapping;
++import org.springframework.web.bind.annotation.PathVariable;
++import org.springframework.web.bind.annotation.RequestBody;
++import org.springframework.web.bind.annotation.RequestMapping;
++import org.springframework.web.bind.annotation.RestController;
++import org.springframework.web.server.ResponseStatusException;
++
++import jakarta.validation.Valid;
++import jakarta.validation.constraints.Pattern;
++import jakarta.validation.constraints.Positive;
++import jakarta.validation.constraints.Size;
++
++// Owner-only listing management. Creating a saree stays on POST /api/sarees.
++// Sarees are never deleted because past orders point at them: hide them instead.
++@RestController
++@RequestMapping("/api/admin/sarees")
++public class AdminSareeController {
++
++    private final SareeRepository repository;
++
++    public AdminSareeController(SareeRepository repository) {
++        this.repository = repository;
++    }
++
++    // Every field is optional: only the ones sent are changed.
++    public record UpdateRequest(
++            @Size(max = 100, message = "type is too long")
++            String type,
++
++            @Positive(message = "price must be more than 0")
++            BigDecimal price,
++
++            @Size(max = 200, message = "title is too long")
++            String title,
++
++            @Size(max = 5000, message = "description is too long")
++            String description,
++
++            @Pattern(regexp = "\\d{10,15}", message = "use digits only, with country code, e.g. 919876543210")
++            String supplierWhatsapp,
++
++            Saree.Status status
++    ) {}
++
++    @GetMapping
++    public List<AdminSareeResponse> listAll() {
++        return repository.findAllByOrderByCreatedAtDesc().stream()
++                .map(AdminSareeResponse::from)
++                .toList();
++    }
++
++    @PatchMapping("/{id}")
++    public AdminSareeResponse update(@PathVariable Long id, @Valid @RequestBody UpdateRequest request) {
++        Saree saree = repository.findById(id)
++                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Saree not found"));
++
++        if (request.type() != null && !request.type().isBlank()) saree.setType(request.type().trim());
++        if (request.price() != null) saree.setPrice(request.price());
++        if (request.title() != null) saree.setTitle(request.title().trim());
++        if (request.description() != null) saree.setDescription(request.description().trim());
++        if (request.supplierWhatsapp() != null) saree.setSupplierWhatsapp(request.supplierWhatsapp());
++        if (request.status() != null) saree.setStatus(request.status());
++
++        return AdminSareeResponse.from(repository.save(saree));
++    }
++}
+diff --git a/src/main/java/com/jas/sarees/saree/AdminSareeResponse.java b/src/main/java/com/jas/sarees/saree/AdminSareeResponse.java
+new file mode 100644
+index 0000000..5998053
+--- /dev/null
++++ b/src/main/java/com/jas/sarees/saree/AdminSareeResponse.java
+@@ -0,0 +1,24 @@
++package com.jas.sarees.saree;
++
++import java.math.BigDecimal;
++import java.time.Instant;
++
++// Everything the owner needs to manage a listing, including the supplier number and hidden ones.
++// Only returned from /api/admin/sarees, which requires the ADMIN role.
++public record AdminSareeResponse(
++        Long id,
++        String type,
++        BigDecimal price,
++        String imageUrl,
++        String title,
++        String description,
++        String supplierWhatsapp,
++        String status,
++        Instant createdAt
++) {
++    public static AdminSareeResponse from(Saree s) {
++        return new AdminSareeResponse(s.getId(), s.getType(), s.getPrice(), s.getImageUrl(),
++                s.getTitle(), s.getDescription(), s.getSupplierWhatsapp(),
++                s.getStatus().name(), s.getCreatedAt());
++    }
++}
+diff --git a/src/main/java/com/jas/sarees/saree/SareeRepository.java b/src/main/java/com/jas/sarees/saree/SareeRepository.java
+index 46c2198..691d344 100644
+--- a/src/main/java/com/jas/sarees/saree/SareeRepository.java
++++ b/src/main/java/com/jas/sarees/saree/SareeRepository.java
+@@ -7,4 +7,6 @@ import org.springframework.data.jpa.repository.JpaRepository;
+ public interface SareeRepository extends JpaRepository<Saree, Long> {
+ 
+     List<Saree> findByStatusOrderByCreatedAtDesc(Saree.Status status);
++
++    List<Saree> findAllByOrderByCreatedAtDesc();
+ }
+\ No newline at end of file

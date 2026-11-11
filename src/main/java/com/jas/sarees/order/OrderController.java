@@ -1,7 +1,9 @@
 package com.jas.sarees.order;
 
+import java.math.BigDecimal;
 import java.util.List;
 
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
@@ -26,11 +28,14 @@ public class OrderController {
     private final SareeOrderRepository orders;
     private final SareeRepository sarees;
     private final SupplierMessage supplierMessage;
+    private final BigDecimal codMinPrice;
 
-    public OrderController(SareeOrderRepository orders, SareeRepository sarees,SupplierMessage supplierMessage) {
+    public OrderController(SareeOrderRepository orders, SareeRepository sarees, SupplierMessage supplierMessage,
+                           @Value("${app.cod-min-price:500}") BigDecimal codMinPrice) {
         this.orders = orders;
         this.sarees = sarees;
         this.supplierMessage = supplierMessage;
+        this.codMinPrice = codMinPrice;
     }
 
     @PostMapping
@@ -40,8 +45,21 @@ public class OrderController {
                 .filter(s -> s.getStatus() == Saree.Status.LIVE)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Saree not available"));
 
+        // Cash on delivery only above the minimum price; UPI needs the transaction ID to verify later.
+        if (request.paymentMethod() == SareeOrder.PaymentMethod.COD) {
+            if (saree.getPrice().compareTo(codMinPrice) <= 0) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Cash on delivery is not available for this saree");
+            }
+        } else if (request.transactionId() == null || request.transactionId().isBlank()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Transaction ID is required for UPI payments");
+        }
+
         SareeOrder order = new SareeOrder();
         order.setSaree(saree);
+        order.setPaymentMethod(request.paymentMethod());
+        if (request.paymentMethod() == SareeOrder.PaymentMethod.UPI) {
+            order.setTransactionId(request.transactionId().trim().toUpperCase());
+        }
         order.setCustomerName(request.customerName().trim());
         order.setCustomerPhone(request.customerPhone());
         order.setAddress(request.address().trim());
@@ -58,6 +76,18 @@ public class OrderController {
     }
 
     public record StatusRequest(@NotNull(message = "status is required") SareeOrder.Status status) {}
+
+    public record PaymentRequest(@NotNull(message = "verified is required") Boolean verified) {}
+
+    @PatchMapping("/{id}/payment")
+    public AdminOrderResponse updatePayment(@PathVariable Long id,
+                                            @Valid @RequestBody PaymentRequest request) {
+        SareeOrder order = orders.findById(id)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Order not found"));
+        order.setPaymentVerified(request.verified());
+        SareeOrder saved = orders.save(order);
+        return AdminOrderResponse.from(saved, supplierMessage.link(saved));
+    }
 
     @PatchMapping("/{id}/status")
     public AdminOrderResponse updateStatus(@PathVariable Long id,

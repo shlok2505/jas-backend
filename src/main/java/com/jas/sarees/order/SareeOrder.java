@@ -23,6 +23,8 @@ public class SareeOrder {
 
     public enum Status { NEW, SENT_TO_SUPPLIER, NOTIFY_FAILED, COMPLETED, CANCELLED }
 
+    public enum PaymentMethod { UPI, COD }
+
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
@@ -50,6 +52,16 @@ public class SareeOrder {
     @Column(nullable = false)
     private Status status = Status.NEW;
 
+    // The defaults in columnDefinition let Hibernate add these columns to a table that already has orders.
+    @Enumerated(EnumType.STRING)
+    @Column(columnDefinition = "varchar(255) default 'UPI'")
+    private PaymentMethod paymentMethod = PaymentMethod.UPI;
+
+    private String transactionId;
+
+    @Column(columnDefinition = "boolean default false")
+    private Boolean paymentVerified = false;
+
     @Column(nullable = false, updatable = false)
     private Instant createdAt;
 
@@ -73,5 +85,11 @@ public class SareeOrder {
     public void setPriceAtOrder(BigDecimal priceAtOrder) { this.priceAtOrder = priceAtOrder; }
     public Status getStatus() { return status; }
     public void setStatus(Status status) { this.status = status; }
+    public PaymentMethod getPaymentMethod() { return paymentMethod == null ? PaymentMethod.UPI : paymentMethod; }
+    public void setPaymentMethod(PaymentMethod paymentMethod) { this.paymentMethod = paymentMethod; }
+    public String getTransactionId() { return transactionId; }
+    public void setTransactionId(String transactionId) { this.transactionId = transactionId; }
+    public boolean isPaymentVerified() { return Boolean.TRUE.equals(paymentVerified); }
+    public void setPaymentVerified(boolean paymentVerified) { this.paymentVerified = paymentVerified; }
     public Instant getCreatedAt() { return createdAt; }
 }

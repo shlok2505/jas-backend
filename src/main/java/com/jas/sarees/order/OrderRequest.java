@@ -23,5 +23,12 @@ public record OrderRequest(
 
         @NotBlank(message = "pincode is required")
         @Pattern(regexp = "\\d{6}", message = "pincode must be 6 digits")
-        String pincode
+        String pincode,
+
+        @NotNull(message = "payment method is required")
+        SareeOrder.PaymentMethod paymentMethod,
+
+        // Required for UPI (checked in the controller). Null is fine for cash on delivery.
+        @Pattern(regexp = "[A-Za-z0-9]{8,30}", message = "enter the transaction ID from your payment app")
+        String transactionId
 ) {}
