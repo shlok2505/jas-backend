@@ -19,7 +19,7 @@ public class SupplierMessage {
         String text = """
                 New order #%d
                 Saree: %s
-                Price: Rs %s
+                
                 Photo: %s%s
 
                 Deliver to:
@@ -29,7 +29,7 @@ public class SupplierMessage {
                 """.formatted(
                 o.getId(),
                 o.getSaree().getTitle(),
-                o.getPriceAtOrder().toPlainString(),
+                
                 baseUrl, o.getSaree().getImageUrl(),
                 o.getCustomerName(),
                 o.getAddress(),
